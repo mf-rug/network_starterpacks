@@ -14,7 +14,7 @@ reticulate::use_virtualenv('venv_shiny_app', required = TRUE)
 
 shinyServer(function(input, output, session) {
 
-  # Reactive value to store the final merged table
+  # Reactive values
   final_table <- reactiveVal(NULL)
   follows <- reactiveVal(NULL)
   followers <- reactiveVal(NULL)
@@ -22,55 +22,56 @@ shinyServer(function(input, output, session) {
   logs <- reactiveVal(NULL)
   
   # Function to load and merge part files
-  load_and_merge_parts <- function(user) {
-    user_list <- read.delim(paste0('/Users/max/Documents/code/network_starterpacks/user_list_',input$user, '.tsv'), header=TRUE, sep='\t', stringsAsFactors = F)
+  load_and_merge_parts <- function(user, recover=FALSE) {
+    user_list <- read.delim(paste0('./user_list_',input$user, '.tsv'), header=TRUE, sep='\t', stringsAsFactors = F)
     follows(nrow(user_list[user_list$Type == 'Follow',]))
     followers(nrow(user_list[user_list$Type == 'Follower',]))
     mutuals(nrow(user_list[user_list$Type == 'Mutual',]))
-    part_files <- list.files(
-      path = "/Users/max/Documents/code/network_starterpacks/",
-      pattern = paste0("^part_", ".*", user, "\\.tsv$"),
-      full.names = TRUE
-    )
-    if (length(part_files) == 0) {
-      cat("No part tables were found.\n")
-      final_table(data.frame())
+    
+    # part files or single file depending on new run or recover
+    pattern = paste0("^part_", ".*", user, "\\.tsv$")
+    if (recover) {
+      pattern <- paste0("^part_all_", user, "\\.tsv$")
+      part_files <- list.files(path = "./",
+                               pattern = pattern,
+                               full.names = TRUE)
+  
+      # Standardize column names and handle empty data frames
+      standard_columns <- c("Type", "Handle", "Display.Name", "Starter.Pack.Name", "URL")
+      df <- read.delim(part_files, header = TRUE, sep = "\t", stringsAsFactors = FALSE)
+      merged_table <- df[, standard_columns, drop = FALSE]  # Reorder to standard column order
     } else {
-        # Standardize column names and handle empty data frames
-        standard_columns <- c("Type", "Handle", "Display.Name", "Starter.Pack.Name", "URL")
-        # if §(!identical(part_files[str_detect(part_files, '_all_')], character(0))) {
-          df <- read.delim(part_files[str_detect(part_files, '_all_')], header = TRUE, sep = "\t", stringsAsFactors = FALSE)
-          print('found all')
-          merged_table <- df[, standard_columns, drop = FALSE]  # Reorder to standard column order
-      #   } else {
-      #   part_tables <- lapply(part_files, function(part_file) {
-      #     df <- read.delim(part_file, header = TRUE, sep = "\t", stringsAsFactors = FALSE)
-      #     
-      #     # Ensure the data frame has the correct columns
-      #     if (nrow(df) == 0) {
-      #       df <- as.data.frame(matrix(ncol = length(standard_columns), nrow = 0))
-      #       colnames(df) <- standard_columns
-      #     } else {
-      #       missing_cols <- setdiff(standard_columns, colnames(df))
-      #       for (col in missing_cols) {
-      #         df[[col]] <- NA  # Add missing columns with NA values
-      #       }
-      #       df <- df[, standard_columns, drop = FALSE]  # Reorder to standard column order
-      #     }
-      #     return(df)
-      #   })
-      #   # Remove any completely empty tables
-      #   part_tables <- part_tables[sapply(part_tables, nrow) > 0]
-      #   if (length(part_tables) == 0) {
-      #     print('log to empty error')
-      #     logs("All part tables are empty.")
-      #     stop("All part tables are empty.")
-      #   }
-      #   
-      #   # Merge all part tables
-      #   merged_table <- do.call(rbind, part_tables)
-      # }
-
+      part_files <- list.files(path = "./",
+                               pattern = pattern,
+                               full.names = TRUE)
+      # Standardize column names and handle empty data frames
+      standard_columns <- c("Type", "Handle", "Display.Name", "Starter.Pack.Name", "URL")
+      part_tables <- lapply(part_files, function(part_file) {
+        df <- read.delim(part_file, header = TRUE, sep = "\t", stringsAsFactors = FALSE)
+        
+        # Ensure the data frame has the correct columns
+        if (nrow(df) == 0) {
+          df <- as.data.frame(matrix(ncol = length(standard_columns), nrow = 0))
+          colnames(df) <- standard_columns
+        } else {
+          missing_cols <- setdiff(standard_columns, colnames(df))
+          for (col in missing_cols) {
+            df[[col]] <- NA  # Add missing columns with NA values
+          }
+          df <- df[, standard_columns, drop = FALSE]  # Reorder to standard column order
+        }
+        return(df)
+      })
+      # Remove any completely empty tables
+      part_tables <- part_tables[sapply(part_tables, nrow) > 0]
+      if (length(part_tables) == 0) {
+        print('log to empty error')
+        logs("All part tables are empty.")
+        stop("All part tables are empty.")
+      }
+      
+      # Merge all part tables
+      merged_table <- do.call(rbind, part_tables)
       if (!input$follows) {
         print('follows not considered')
         merged_table <- merged_table[merged_table$Type != 'Follow',]
@@ -79,50 +80,53 @@ shinyServer(function(input, output, session) {
         print('followers not considered')
         merged_table <- merged_table[merged_table$Type != 'Follower',]
       }
-  
-      dff <<- merged_table
-      merge_path = paste0("/Users/max/Documents/code/network_starterpacks/part_all_", user, '.tsv')
-      file.remove(part_files)
-      write.table(merged_table, merge_path, sep='\t', quote = FALSE, row.names = FALSE)
-      final_table(merged_table)  # Update the reactive value with the merged table
-      cat(paste("Final table with", nrow(merged_table), "rows created successfully.\n"))
     }
+    if (!input$follows) {
+      merged_table <- merged_table[merged_table$Type != 'Follow',]
+    }
+    if (!input$followers) {
+      merged_table <- merged_table[merged_table$Type != 'Follower',]
+    }
+    
+    merge_path = paste0("./part_all_", user, '.tsv')
+    browser()
+    file.remove(part_files)
+    write.table(merged_table, merge_path, sep='\t', quote = FALSE, row.names = FALSE)
+    final_table(merged_table)  # Update the reactive value with the merged table
+
   }
   
   
   observeEvent(input$run_button, {
-    cat("\014")  # Clear R console for easier debugging
     logs(NULL)  # Reset logs
-    
+    old_run = paste0("./part_all_", input$user, '.tsv')
+    if (file.exists(old_run)) {
+      file.remove(old_run)
+    }
     tryCatch({
-      print('Logging in, reusing old session if possible')
       withProgress(message = "Logging in", value = 0.2, {
         tryCatch({
           sys <- import("sys")
-          sys$argv <- c('/Users/max/Documents/code/network_starterpacks/login.py', input$username, input$app_password)
-          source_python("/Users/max/Documents/code/network_starterpacks/login.py")
+          sys$argv <- c('./login.py', input$username, input$app_password)
+          source_python("./login.py")
           
           result <- py$main()
           if (is.null(result)) {
             stop('Login Failed')
           }
           logs(paste0("Login successful.\n"))
-          cat("Login successful or session reused.\n")
         }, error = function(e) {
-          print('log to error')
           logs(paste0("Error during login process: ", e$message, "\n"))
-          # browser()
           updateTabsetPanel(session, "main_tabs", selected = "Logs")
           stop("Error during login process: ", e$message, "\n")
         })
       })
       
-      print('Fetching followers and follows...')
-      # Step 1: Run the first Python script (/Users/max/Documents/code/network_starterpacks/get_follows.py)
+      # Step 1: Run the first Python script (./get_follows.py)
       withProgress(message = "Fetching followers and follows...", value = 0.2, {
         sys <- import("sys")
-        sys$argv <- c('/Users/max/Documents/code/network_starterpacks/get_follows.py', input$user, input$follows, input$followers)
-        source_python("/Users/max/Documents/code/network_starterpacks/get_follows.py")
+        sys$argv <- c('./get_follows.py', input$user, input$follows, input$followers)
+        source_python("./get_follows.py")
         result <- py$main()
         if (result$status == "error") {
           logs(paste0('Error in getting follow(er)s:\n', str_extract(result$message, "(?<=message=')[^']*"), '\n'))
@@ -134,33 +138,31 @@ shinyServer(function(input, output, session) {
       })
 
       # Step 2: Read user_list.tsv
-      user_list_path <- paste0("/Users/max/Documents/code/network_starterpacks/user_list_", input$user, ".tsv")
+      user_list_path <- paste0("./user_list_", input$user, ".tsv")
       if (!file.exists(user_list_path)) {
         stop("user_list.tsv not found.")
       }
       user_data <- read.delim(user_list_path, header = TRUE, sep = "\t", stringsAsFactors = FALSE)
 
-      # Step 3: Loop over users in batches and call /Users/max/Documents/code/network_starterpacks/process_follows.py
-      batch_size <- 25  # Define batch size
+      # Step 3: Loop over users in batches and call ./process_follows.py
       total_users <- nrow(user_data)
-      total_batches <- ceiling(total_users / batch_size)  # Calculate total number of batches
+      total_batches <- ceiling(total_users / 25)  # Calculate total number of batches
       
       withProgress(message = "Processing", value = 0, {
         for (batch in seq_len(total_batches)) {
           # Calculate line range for the current batch
-          start_line <- (batch - 1) * batch_size + 1
-          end_line <- min(batch * batch_size, total_users)
+          start_line <- (batch - 1) * 25 + 1
+          end_line <- min(batch * 25, total_users)
           
-          # Call /Users/max/Documents/code/network_starterpacks/process_25_follows.py
+          # Call ./process_25_follows.py
           incProgress(1 / total_batches, detail = paste("Batch", batch, '/', total_batches, ': Users', start_line, '-', end_line))
           sys <- import("sys")
-          sys$argv <- c('/Users/max/Documents/code/network_starterpacks/process_25_follows.py', 
+          sys$argv <- c('./process_25_follows.py', 
                         user_list_path,
                         input$user,
                         start_line, 
                         end_line)
-          print(paste("Running batch for lines", start_line, "-", end_line))
-          source_python("/Users/max/Documents/code/network_starterpacks/process_25_follows.py")
+          source_python("./process_25_follows.py")
           result <- py$main()
           if (result$status == "error") {
             logs(paste0('Error in processing:\n', result$message, '\n'))
@@ -176,15 +178,17 @@ shinyServer(function(input, output, session) {
       load_and_merge_parts(input$user)
       
     }, error = function(e) {
-      # Print errors to the R console
-      cat("Error in merge:", e$message, "\n")
+      logs(paste0('Error in processing follow(er)s\n:', e$message, '\n'))
+      browser()
+      updateTabsetPanel(session, "main_tabs", selected = "Logs")
+      stop("Stopping because of a python error in process_25_follows.py")
     })
   })
   
   observeEvent(input$anal_button, {
     logs(NULL)
     tryCatch({
-      load_and_merge_parts(input$user)
+      load_and_merge_parts(input$user, recover = TRUE)
       logs('Successfully restored table')
     }, error = function(e) {
       if (str_detect(e$message, 'cannot open the connection')) {
@@ -193,7 +197,6 @@ shinyServer(function(input, output, session) {
           e$message <- 'No user name supplied.'
         }
       }
-      cat("Error in restore:", e$message, "\n")
       updateTabsetPanel(session, "main_tabs", selected = "Logs")
       output$logs <- renderText({
         paste("Error in restore:", e$message)
@@ -220,8 +223,7 @@ shinyServer(function(input, output, session) {
       
       # Select and display the desired columns
       df <- df[, c('Starter Pack', 'Connection', 'Type')]
-      # df$Connection_plain <- gsub(" \\(<a.*</a>\\)", "", df$Connection)  # Strip HTML and extra text
-  
+
       datatable(df[,], 
                 rownames = FALSE,
                 escape = FALSE,
@@ -272,7 +274,7 @@ shinyServer(function(input, output, session) {
       out <- 'Last log output from file:\n'
   
       # Path to the log file
-      log_file <- "/Users/max/Documents/code/network_starterpacks/atproto_script.log"
+      log_file <- "./atproto_script.log"
       
       # Check if the file exists
       if (!file.exists(log_file)) {
