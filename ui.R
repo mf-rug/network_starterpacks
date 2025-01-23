@@ -19,6 +19,38 @@ shinyUI(page_navbar(
   ),
   tags$style(
     HTML("
+      #fler_table_out table > thead > tr > th,
+      #fler_table_out table > tbody > tr > th,
+      #fler_table_out table > tfoot > tr > th,
+      #fler_table_out table > thead > tr > td,
+      #fler_table_out table > tbody > tr > td,
+      #fler_table_out table > tfoot > tr > td 
+      
+      #fl_table_out table > thead > tr > th,
+      #fl_table_out table > tbody > tr > th,
+      #fl_table_out table > tfoot > tr > th,
+      #fl_table_out table > thead > tr > td,
+      #fl_table_out table > tbody > tr > td,
+      #fl_table_out table > tfoot > tr > td 
+      
+      #sp_table_out table > thead > tr > th,
+      #sp_table_out table > tbody > tr > th,
+      #sp_table_out table > tfoot > tr > th,
+      #sp_table_out table > thead > tr > td,
+      #sp_table_out table > tbody > tr > td,
+      #sp_table_out table > tfoot > tr > td 
+
+      #user_table_out table > thead > tr > th,
+      #user_table_out table > tbody > tr > th,
+      #user_table_out table > tfoot > tr > th,
+      #user_table_out table > thead > tr > td,
+      #user_table_out table > tbody > tr > td,
+      #user_table_out table > tfoot > tr > td {
+      
+      padding: 0.2rem; 
+      margin: 0; 
+      vertical-align: middle; 
+    }
     .scrollablex {
         max-width: 25vw;
         margin: 0;
@@ -36,7 +68,11 @@ shinyUI(page_navbar(
         overflow: scroll;
         table-layout: fixed;
     }
-    
+    .user {
+        padding: -3px, -3, -3px;
+        overflow-x: scroll;
+        table-layout: fixed;
+    }
     details > summary {
         list-style-type: none;
     }
@@ -44,7 +80,7 @@ shinyUI(page_navbar(
     details[open] > summary {
         list-style-type: none;
     }
-
+  
     details {
         border: 1px solid transparent;
         box-shadow: 2px 2px 8px rgba(50, 180, 200, 0.3);

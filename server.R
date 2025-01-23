@@ -163,14 +163,14 @@ shinyServer(function(input, output, session) {
         write_tsv(flwer_data_adj, flwer_data_path_adj, col_names = TRUE)
         total_users <- nrow(flwer_data_adj)
         total_batches <- ceiling(total_users / 25)  # Calculate total number of batches
-        withProgress(message = "Processing", value = 0, {
+        withProgress(message = "Processing SPs", value = 0, {
           for (batch in seq_len(total_batches)) {
             # Calculate line range for the current batch
             start_line <- (batch - 1) * 25 + 1
             end_line <- min(batch * 25, total_users)
             # browser()
             # Call ./process_25_follows.py
-            incProgress(1 / total_batches, detail = paste("Batch", batch, '/', total_batches, ': users', start_line, '-', end_line))
+            incProgress(1 / total_batches, detail = paste("User batch", batch, '/', total_batches, ': users', start_line, '-', end_line))
             sys <- import("sys")
             sys_args <- c('./process_25_follows.py', 
                           flwer_data_path_adj,
@@ -343,23 +343,71 @@ shinyServer(function(input, output, session) {
   })
   output$user_table_out <- DT::renderDataTable({
     df <- users_df()
-    df$avatar <- paste0('<img src="', df$avatar, '" style="width: 50px; height: 50px; border-radius: 50%; overflow: hidden; object-fit: cover;">&nbsp')
     if (is.data.frame(df) && nrow(df) > 0) {
-      # browser()
+      df$avatar <- paste0('<img src="', df$avatar, '" style="width: 50px; height: 50px; border-radius: 50%; overflow: hidden; object-fit: cover;">')
+      df[is.na(df$Description), "Description"] <- ''
       df1 <- df[!is.na(as.numeric(df$Count)), ]
       df2 <- df[is.na(as.numeric(df$Count)), ]
       if (nrow(df1) > 0) {
         df1$Handle <-
-          paste0('<div class=scrollable><strong>', df1$avatar, df1$Name, '</strong> (<a href="https://bsky.app/profile/', df1$Handle, '" target="_blank">', df1$Handle, '</a>)',
-                 '<br><i><span style="display: inline-block; border-top: 1px solid black; border-bottom: 1px solid black; padding: 2px; color: grey;">Listed in ', 
-                 df1$Count, ' starter pack', ifelse(df1$Count > 1, 's', ''), '</span></i><br><p style="font-size:13px; ">', df1$Description, '</p></div>')
+          paste0(
+              '<div class=scrollable>',
+              '<table style="width: 100%; border-collapse: collapse;">',
+              # Top row: Avatar in the left cell, Name and Handle in the right cell
+              '<tr>',
+              '<td style="width: 20%; text-align: center; vertical-align: middle;">',
+              df1$avatar,
+              '</td>',
+              '<td style="width: 80%; text-align: left; vertical-align: middle; line-height:1.15;">',
+              '<div>',
+              '<strong>', df1$Name, '</strong><br>',
+              '<a href="https://bsky.app/profile/', df1$Handle, 
+              '" target="_blank">', df1$Handle, '</a><br>',
+              
+              '<span style="font-size:13px; color: grey;"><i>Listed in ', df1$Count, ' starter pack',
+              ifelse(df1$Count > 1, 's', ''), '</i></span>',
+              '</div>',
+              '</td>',
+              '</tr>',
+              
+              '<tr>',
+              '<td colspan="2" style="padding: 0px; font-size: 13px;">',
+              '<p>', df1$Description, '</p>',
+              '</td>',
+              '</tr>',
+              '</table>',
+              '</div>'
+          )
       }
       if (nrow(df2) > 0) {
         df2$Handle <-
-          paste0('<div class=scrollable><strong>', df2$avatar, df2$Name, '</strong> (<a href="https://bsky.app/profile/', df2$Handle, '" target="_blank">', df2$Handle, '</a>)',
-                 '<br><i><span style="display: inline-block; border-top: 1px solid black; border-bottom: 1px solid black; padding: 2px; color: grey;">Is a selected ', 
-                 df2$Count, '</span></i><br><p style="font-size:13px; ">', df2$Description, '</p></div>')
-      }
+          paste0(
+            '<div class=scrollable>',
+              '<table style="width: 100%; border-collapse: collapse;">',
+                # Top row: Avatar in the left cell, Name and Handle in the right cell
+                '<tr>',
+                  '<td style="width: 20%; text-align: center; vertical-align: middle;">',
+                    df2$avatar,
+                  '</td>',
+                  '<td style="width: 80%; text-align: left; vertical-align: middle; line-height:1.15;">',
+                    '<div>',
+                      '<strong>', df2$Name, '</strong><br>',
+                      '<a href="https://bsky.app/profile/', df2$Handle,
+                      '" target="_blank">', df2$Handle, '</a><br>',
+                      '<span style="font-size:13px; color: grey;"><i>Is a selected ', df2$Count, '</i></span>',
+                    '</div>',
+                  '</td>',
+                '</tr>',
+                
+                '<tr>',
+                '<td colspan="2" style="padding: 0px; font-size: 13px;">',
+                '<p>', df2$Description, '</p>',
+                '</td>',
+                '</tr>',
+              '</table>',
+            '</div>'
+          )
+       }
       df <- rbind(df1,df2)
       colnames(df) <- c('user', 'name', 'avatar', 'SPs', 'posts', 'reposts', 'fllwrs', 'fllws', 'Description', 'lastPosts', 'AIcateg', 'AIsig', 'AIsummary')
       df$lastPosts <- str_replace_all(df$lastPosts, '\\|\\|\\-\\-\\|\\|', '<br>• ') %>% 
@@ -379,6 +427,7 @@ shinyServer(function(input, output, session) {
                     str_replace('$', '</p>')
       # browser()
       df$reposts <- sapply(df$reposts, function(x) if (!is.na(x) && !str_detect(x, "NA")) { paste(x, '%') } else {x})
+      df$reposts <- paste0('<p style="text-align:right;margin:0;padding:0;">', df$reposts, '</p>')
       if (isolate(input$aisum)) {
         df <- df[order(df$SPs, decreasing = TRUE), c('user', 'posts', 'reposts', 'fllwrs', 'fllws', 'lastPosts', 'AIcateg', 'AIsig', 'AIsummary')]
       } else {
@@ -544,13 +593,33 @@ shinyServer(function(input, output, session) {
     df <- follows()
     if (input$follows && is.data.frame(df) && nrow(df) > 0) {
       df[!is.na(df$Display.Name) & df$Display.Name == '', 'Display.Name'] <- '<i>n.a.</i>'
-      df$user <- paste0(df$Display.Name, ' (<a href="https://bsky.app/profile/', df$Handle, '" target="_blank">', df$Handle, '</a>)')
+      df$avatar <- paste0('<img src="', df$avatar, '" style="width: 35px; height: 35px; border-radius: 50%; overflow: hidden; object-fit: cover;">')
+      df$user <- paste0(
+        '<table style="width: 100%;">
+        <th style="padding:0;">
+          <td style="margin: 0; padding: 0;line-height: 1; width: 35px;">',
+        df$avatar,
+        '</td>
+        </th>
+        <th>
+          <td style="margin: 0; padding: 0; line-height: normal;">',
+        df$Display.Name,
+        ' (<a href="https://bsky.app/profile/',
+        df$Handle,
+        '" target="_blank">',
+        df$Handle,
+        '</a>)',
+        '</td>
+        </th>
+      </table>'
+      )
       df <- df[c('user', "Description", "Created")]
+      colnames(df)[1] <- 'User'
       df$Created <- format(ymd_hms(gsub("Z", "", df$Created)), "%d %b %Y") %>% 
         str_replace('^', '<span style="font-size:13px; ">') %>% 
         str_replace('$', '</span>')
       df$Description <- df$Description %>% 
-        str_replace('^', '<div class=scrollablex><p style="font-size:11px; ">') %>% 
+        str_replace('^', '<div class=scrollable><p style="font-size:11px; margin: 0;">') %>% 
         str_replace('$', '</p></div>')
       datatable(df,
                 escape = FALSE,
@@ -619,13 +688,33 @@ shinyServer(function(input, output, session) {
     df <- mutuals()
     if (is.data.frame(df) && nrow(df) > 0) {
       df[!is.na(df$Display.Name) & df$Display.Name == '', 'Display.Name'] <- '<i>n.a.</i>'
-      df$user <- paste0(df$Display.Name, ' (<a href="https://bsky.app/profile/', df$Handle, '" target="_blank">', df$Handle, '</a>)')
+      df$avatar <- paste0('<img src="', df$avatar, '" style="width: 50px; height: 50px; border-radius: 50%; overflow: hidden; object-fit: cover;">')
+      df$user <- paste0(
+        '<table style="width: 100%;">
+        <th style="padding:0;">
+          <td style="margin: 0; padding: 0;line-height: 1; width: 35px;">',
+        df$avatar,
+        '</td>
+        </th>
+        <th>
+          <td style="margin: 0; padding: 0; line-height: normal;">',
+        df$Display.Name,
+        ' (<a href="https://bsky.app/profile/',
+        df$Handle,
+        '" target="_blank">',
+        df$Handle,
+        '</a>)',
+        '</td>
+        </th>
+      </table>'
+      )
       df <- df[c('user', "Description", "Created")]
+      colnames(df)[1] <- 'User'
       df$Created <- format(ymd_hms(gsub("Z", "", df$Created)), "%d %b %Y") %>% 
         str_replace('^', '<span style="font-size:13px; ">') %>% 
         str_replace('$', '</span>')
       df$Description <- df$Description %>% 
-        str_replace('^', '<div class=scrollablex><p style="font-size:11px; ">') %>% 
+        str_replace('^', '<div class=scrollable><p style="font-size:11px; margin: 0;">') %>% 
         str_replace('$', '</p></div>')
       datatable(df,
                 escape = FALSE,
@@ -690,15 +779,35 @@ shinyServer(function(input, output, session) {
   
   output$fler_table_out <- renderDT({
     df <- followers()
-    if (input$follows && is.data.frame(df) && nrow(df) > 0) {
+    if (input$followers && is.data.frame(df) && nrow(df) > 0) {
       df[!is.na(df$Display.Name) & df$Display.Name == '', 'Display.Name'] <- '<i>n.a.</i>'
-      df$user <- paste0(df$Display.Name, ' (<a href="https://bsky.app/profile/', df$Handle, '" target="_blank">', df$Handle, '</a>)')
+      df$avatar <- paste0('<img src="', df$avatar, '" style="width: 40px; height: 40px; border-radius: 50%; overflow: hidden; object-fit: cover;">')
+      df$user <- paste0(
+        '<table style="width: 100%;">
+        <th style="padding:0;">
+          <td style="margin: 0; padding: 0;line-height: 1; width: 35px;">',
+        df$avatar,
+        '</td>
+        </th>
+        <th>
+          <td style="margin: 0; padding: 0; line-height: normal;">',
+        df$Display.Name,
+        ' (<a href="https://bsky.app/profile/',
+        df$Handle,
+        '" target="_blank">',
+        df$Handle,
+        '</a>)',
+        '</td>
+        </th>
+      </table>'
+      )
       df <- df[c('user', "Description", "Created")]
+      colnames(df)[1] <- 'User'
       df$Created <- format(ymd_hms(gsub("Z", "", df$Created)), "%d %b %Y") %>% 
         str_replace('^', '<span style="font-size:13px; ">') %>% 
         str_replace('$', '</span>')
       df$Description <- df$Description %>% 
-        str_replace('^', '<div class=scrollablex><p style="font-size:11px; ">') %>% 
+        str_replace('^', '<div class=scrollable><p style="font-size:11px; margin: 0;">') %>% 
         str_replace('$', '</p></div>')
       datatable(df,
                 escape = FALSE,
