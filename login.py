@@ -34,6 +34,7 @@ def load_client():
             if test_get_follows is None:
                 raise ValueError("Session validation failed: client.me() returned None.")
             logging.info("Session is valid. Reusing existing session.")
+            client.me = client._session
             return client
         except Exception as e:
             logging.warning(f"Failed to reuse session: {str(e)}. Falling back to login.")

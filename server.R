@@ -1,15 +1,17 @@
 options(reticulate.output_handler = function(x) cat(x, "\n"))
 
 envs <- reticulate::virtualenv_list()
-if (!'venv_shiny_app' %in% envs) {
-    reticulate::virtualenv_create(envname = 'venv_shiny_app',
-                                  python = '/usr/bin/python3')
-    reticulate::virtualenv_install('venv_shiny_app',
+if (!'venv_bsky_network' %in% envs) {
+    reticulate::virtualenv_create(envname = 'venv_bsky_network',
+                                  python = '/opt/homebrew/bin/python3'
+                                  # python = '/usr/bin/python3'
+    )
+    reticulate::virtualenv_install('venv_bsky_network',
                                    packages = c('Bio', 'openai', 'atproto', 'python-dotenv'))
 }
 # https://github.com/ranikay/shiny-reticulate-app
 # Set environment BEFORE this
-reticulate::use_virtualenv('venv_shiny_app', required = TRUE)
+reticulate::use_virtualenv('venv_bsky_network', required = TRUE)
 
 
 shinyServer(function(input, output, session) {
@@ -25,6 +27,7 @@ shinyServer(function(input, output, session) {
   fl_table_all_button <- reactiveVal(NULL)
   sp_table_all_button <- reactiveVal(NULL)
   req_df <- reactiveVal(NULL)
+  username_already_follows <- reactiveVal(NULL)
   
   # Function to load and merge part files
   load_and_merge_parts <- function(user, recover=FALSE) {
@@ -94,6 +97,10 @@ shinyServer(function(input, output, session) {
     file.remove(part_files)
     write.table(merged_table, merge_path, sep='\t', quote = FALSE, row.names = FALSE)
     
+    # Reorder rows by custom type order: mutuals -> follow -> follower
+    merged_table$Type <- factor(merged_table$Type, levels = c("User", "Mutual", "Follow", "Follower"))
+    merged_table <- merged_table[order(merged_table$Type), ]
+    
     sp_df(merged_table)  # Update the reactive value with the merged table
   }
   
@@ -110,11 +117,19 @@ shinyServer(function(input, output, session) {
           sys <- import("sys")
           sys$argv <- c('./login.py', input$username, input$app_password)
           source_python("./login.py")
-          
+
           result <- py$main()
+          
           if (is.null(result)) {
             stop('Login Failed')
           }
+          
+          if (input$username == '') {
+            client <- load_client()
+            handle <- client$me$handle
+            updateTextInput(session, 'username', value = handle)
+          }
+          
           logs(paste0("Login successful.\n"))
         }, error = function(e) {
           logs(paste0("Error during login process: ", e$message, "\n"))
@@ -129,6 +144,10 @@ shinyServer(function(input, output, session) {
         sys$argv <- c('./get_follows.py', input$user, input$follows, input$followers)
         cat('Running this command:\n', paste('python3 get_follows.py',  input$user, input$follows, input$followers), '\n')
         source_python("./get_follows.py")
+        already_fls <- get_all_followers_and_follows(client, input$username, 'FALSE', 'TRUE', aslist = TRUE)
+        already_fls <- py_to_r(already_fls$follows) %>% sapply(., function(x) x[[1]])
+        username_already_follows(already_fls)
+        
         result <- py$main()
         if (result$status == "error") {
           logs(paste0('Error in getting follow(er)s:\n', str_extract(result$message, "(?<=message=')[^']*"), '\n'))
@@ -201,27 +220,48 @@ shinyServer(function(input, output, session) {
 
   
   observeEvent(input$restore_sp, {
-    sp_df(NULL)
-    logs(NULL)
-    tryCatch({
-      if (file.exists(paste0("./part_all_", input$user, ".tsv"))) {
-        load_and_merge_parts(input$user, recover = TRUE)
-      } else {
-        stop('No previous runs found. Run a new search.')
-      }
-      logs('Successfully restored table')
-    }, error = function(e) {
-      if (str_detect(e$message, 'cannot open the connection')) {
-        e$message <- 'No previous runs found. Run a new search.'
-        if (input$user == '') {
-          e$message <- 'No user name supplied.'
-        }
-      }
-      updateTabsetPanel(session, "main_tabs", selected = "Logs")
-      output$logs <- renderText({
-        paste("Error in restore:", e$message)
-      })
-    })
+    handle <- input$username
+    if (input$username == '') {
+      source_python('login.py')
+      client <- load_client()
+      handle <- client$me$handle
+      updateTextInput(session, 'username', value = handle)
+    }
+    source_python("./get_follows.py")
+    already_fls <- get_all_followers_and_follows(client, handle, 'FALSE', 'TRUE', aslist = TRUE)
+    already_fls <- py_to_r(already_fls$follows) %>% sapply(., function(x) x[[1]])
+    username_already_follows(already_fls)
+    
+    merge_path = "./save_all_maxfus.bsky.social.tsv"
+    merged_table <- read.delim(merge_path, header = TRUE, sep = "\t", stringsAsFactors = FALSE)
+    
+    shinyjs::show('user_anal_hidden')
+    
+    merged_table$Type <- factor(merged_table$Type, levels = c("User", "Mutual", "Follow", "Follower"))
+    merged_table <- merged_table[order(merged_table$Type), ]
+    
+    sp_df(merged_table)  # Update the reactive value with the merged table
+    # sp_df(NULL)
+    # logs(NULL)
+    # tryCatch({
+    #   if (file.exists(paste0("./part_all_", input$user, ".tsv"))) {
+    #     load_and_merge_parts(input$user, recover = TRUE)
+    #   } else {
+    #     stop('No previous runs found. Run a new search.')
+    #   }
+    #   logs('Successfully restored table')
+    # }, error = function(e) {
+    #   if (str_detect(e$message, 'cannot open the connection')) {
+    #     e$message <- 'No previous runs found. Run a new search.'
+    #     if (input$user == '') {
+    #       e$message <- 'No user name supplied.'
+    #     }
+    #   }
+    #   updateTabsetPanel(session, "main_tabs", selected = "Logs")
+    #   output$logs <- renderText({
+    #     paste("Error in restore:", e$message)
+    #   })
+    # })
   })
   
   
@@ -265,7 +305,8 @@ shinyServer(function(input, output, session) {
             input$sp_cutoff,
             input$fllwer_cutoff,
             input$days_cutoff,
-            input$already_fl
+            input$already_fl,
+            paste0(job_id, '_users')
           )
           sys$argv <- sys_args
           cat('Running this command:\npython3', paste(sys_args, collapse = " "),'\n')
@@ -299,7 +340,8 @@ shinyServer(function(input, output, session) {
           NA, #, input$sp_cutoff,
           0, #, input$fllwer_cutoff,
           0, #, input$days_cutoff,
-          FALSE #, input$already_fl
+          FALSE, #, input$already_fl
+          paste0(job_id, '_sps')
         )
         sys$argv <- sys_args
         cat('Running this command:\npython3', paste(sys_args, collapse = " "),'\n')
@@ -311,17 +353,40 @@ shinyServer(function(input, output, session) {
         print(paste0('error in fl(er) analysis and ./analyse_users.py:', e$message))
       })
     })
+    # browser()
+    #check why lastposts are only 5, if here already gone
+    # add functionality in # of posts : how many in last month
     users_df(rbind(flwer_data_fl, flwer_data_sp))
   })
   
+  observe({
+    if (is.data.frame(users_df())) {
+      shinyjs::show('user_filter_hidden')
+    } else {
+      shinyjs::hide('user_filter_hidden')
+    }
+  })
+  
+  observeEvent(input$restore_users, {
+    # browser()
+    flwer_data <- read.delim(
+      'maxfus.bsky.social_user_data_detailed_160kmeBZdGx9VuNvqlLYQgKEs2ych4Sp5OijAnJTX3RUbMCrI8zPFoDf7WHawt_sps.tsv',
+      header = TRUE,
+      sep = "\t",
+      stringsAsFactors = FALSE
+    )
+    # browser()
+    users_df(flwer_data)
+  })
   
   output$user_table <- renderUI({
-    df <- users_df()
+    df <- user_table_aft_filter()
+    # browser()
     if (is.data.frame(df)) {
       if (nrow(df) > 0) {
         HTML(
           paste0(
-            '<details class="user_details"><summary>',
+            '<details class="user_details" open=""><summary>',
             '<span style="display: flex; justify-content: space-between;">',
             
             '<span style="font-size:19px;text-decoration: underline;"><strong>Got a total of ', 
@@ -341,10 +406,19 @@ shinyServer(function(input, output, session) {
       DT::dataTableOutput('user_table_out')
     }
   })
-  output$user_table_out <- DT::renderDataTable({
+  
+  user_table_bef_filter <- reactive({
     df <- users_df()
     if (is.data.frame(df) && nrow(df) > 0) {
-      df$avatar <- paste0('<img src="', df$avatar, '" style="width: 50px; height: 50px; border-radius: 50%; overflow: hidden; object-fit: cover;">')
+      # browser()
+      isolate(df$avatar <- mapply(
+        avatar_btn, 
+        img = df$avatar,  
+        id_prefix = "avatar_btn", 
+        handle = df$Handle,
+        SIMPLIFY = TRUE
+      ))
+      # browser()
       df[is.na(df$Description), "Description"] <- ''
       df1 <- df[!is.na(as.numeric(df$Count)), ]
       df2 <- df[is.na(as.numeric(df$Count)), ]
@@ -410,10 +484,10 @@ shinyServer(function(input, output, session) {
        }
       df <- rbind(df1,df2)
       colnames(df) <- c('user', 'name', 'avatar', 'SPs', 'posts', 'reposts', 'fllwrs', 'fllws', 'Description', 'lastPosts', 'AIcateg', 'AIsig', 'AIsummary')
-      df$lastPosts <- str_replace_all(df$lastPosts, '\\|\\|\\-\\-\\|\\|', '<br>• ') %>% 
+      df$lastPosts <- str_replace_all(df$lastPosts, '\\|\\|\\-\\-\\|\\|', '<br><br>• ') %>% 
                       str_replace(., '^(?=.)', '•') %>% 
                       str_replace_all(., '\\|\\|\\|\\|', '<br>') %>% 
-                      str_extract(., "•[^•]*(?:•[^•]*)?(?:•[^•]*)?(?:•[^•]*)?(?:•[^•]*)?") %>% 
+                      # str_extract(., "•[^•]*(?:•[^•]*)?(?:•[^•]*)?(?:•[^•]*)?(?:•[^•]*)?") %>% 
                       str_replace('^', '<div class=scrollable><p style="font-size:11px; ">') %>% 
                       str_replace('$', '</p></div>')
       df$AIsig <- df$AIsig %>% 
@@ -426,7 +500,7 @@ shinyServer(function(input, output, session) {
                     str_replace('^', '<div class=scrollable><p style="font-size:11px; ">') %>% 
                     str_replace('$', '</p>')
       # browser()
-      df$reposts <- sapply(df$reposts, function(x) if (!is.na(x) && !str_detect(x, "NA")) { paste(x, '%') } else {x})
+      df$reposts <- sapply(df$reposts, function(x) if (!is.na(x) && !str_detect(x, "NA")) { paste0(x, '%') } else {x})
       df$reposts <- paste0('<p style="text-align:right;margin:0;padding:0;">', df$reposts, '</p>')
       if (isolate(input$aisum)) {
         df <- df[order(df$SPs, decreasing = TRUE), c('user', 'posts', 'reposts', 'fllwrs', 'fllws', 'lastPosts', 'AIcateg', 'AIsig', 'AIsummary')]
@@ -437,6 +511,41 @@ shinyServer(function(input, output, session) {
           df <- df[order(df$SPs, decreasing = TRUE), c('user', 'posts', 'fllwrs', 'fllws')]
         }
       }
+      df
+    }
+  })
+  
+  user_table_aft_filter <- reactive({
+    df <- user_table_bef_filter()
+    if (is.data.frame(df) && nrow(df) > 0) {
+      if (input$already_fl_us) {
+        df <- df %>% filter(!str_extract(df$user, '(?<=_blank\">)[^<]*') %in% isolate(username_already_follows()))
+      }
+      if (input$descr_filter != '') {
+        pattern <- input$descr_filter
+        if (!input$regex) {
+          pattern <- fixed(input$descr_filter,ignore_case = !input$case)
+        }
+        df <- df %>% filter(
+          str_detect(
+            str_extract(user, '(?<=<p>).*(?=</p></td></tr></table></div>$)'),
+            pattern
+          )
+        )
+      }
+      # browser()
+      df %>% 
+        filter(as.numeric(str_extract(posts, '^\\d+')) > input$min_posts) %>% 
+        filter(as.numeric(str_remove(str_extract(posts, '\\d+.$'), '[)]')) > input$min_posts_lm) %>% 
+        filter(fllws > input$min_fl) %>% 
+        filter(fllwrs > input$min_fler) %>% 
+        filter(as.numeric(str_remove(str_replace_all(reposts, "<[^>]+>", ""), '%')) < input$max_repost)
+    }
+  })
+  
+  output$user_table_out <- DT::renderDataTable({
+    df <- user_table_aft_filter()
+    if (is.data.frame(df) && nrow(df) > 0) {
       datatable(df,
         rownames = FALSE,
         escape = FALSE,
@@ -460,9 +569,6 @@ shinyServer(function(input, output, session) {
     
         df$URL <- paste0('<a href="', df$URL, '" target="_blank">', df$Starter.Pack.Name, '</a>')
         colnames(df) <- c('Type', 'Connection', 'display name', 'starter pack name', 'Starter Pack')
-        # Reorder rows by custom type order: mutuals -> follow -> follower
-        df$Type <- factor(df$Type, levels = c("user", "Mutual", "Follow", "Follower"))
-        df <- df[order(df$Type), ]
         
         # Select and display the desired columns
         df <- df[, c('Starter Pack', 'Connection', 'Type')]
@@ -589,11 +695,103 @@ shinyServer(function(input, output, session) {
   
   fl_table_out_proxy <- dataTableProxy("fl_table_out")
   
+  
+  
+  avatar_btn <- function(img, id_prefix, handle) {
+    # browser()
+    already_following <- handle %in% username_already_follows()
+    btn <- tags$div(
+      style = "position: relative; display: inline-block;",
+      actionButton(
+        inputId = paste0(id_prefix, "_", handle),
+        label = NULL,
+        class = "avatar-btn",
+        style = paste0("width: 50px; height: 50px; border-radius: 50%; overflow: hidden; padding:0; 
+             background: url('", img, "'); 
+             background-size: cover;",
+                       ifelse(already_following,
+                       'box-shadow: 0 0 0 2px #4e8cff, 0 0 10px rgba(0,0,0,0.2);',
+                       ''),
+             "background-position: center;"),
+        `data-id` = paste0(id_prefix, "_", handle, "_", already_following)  # Store ID in a data attribute
+      ),
+      tags$span(
+        ifelse(already_following,
+               'Stop following',
+               "Click to follow"), 
+        class = "avatar-tooltip"
+      )
+    )
+    # browser()
+    return(as.character(btn))
+  }
+  
+  
+  observeEvent(input$clicked_avatar, {
+    req(input$clicked_avatar)  # Ensure valid click
+
+    # Extract the index from the button ID
+    btn_id <- input$clicked_avatar$btnId  # Get clicked button ID
+    handle <- sub("avatar_btn_", "", btn_id)
+    already_following <- str_extract(input$clicked_avatar$dataId, "(?<=_)(?:FALSE|TRUE)$")
+    # browser()
+    isolate({
+      if (as.logical(already_following)) {
+        fl_request <- 'unfollow'
+        username_already_follows(setdiff(username_already_follows(), handle))
+      } else {
+        fl_request <- 'follow'
+        username_already_follows(c(username_already_follows(), handle))
+      }
+    })
+    # JavaScript to update both the button's shadow and the tooltip text
+    runjs(sprintf("
+        var btn = $('[id=\"%s\"]');
+        var tooltip = btn.next('.avatar-tooltip');
+
+        if (tooltip.text() === 'Click to follow') {
+            btn.css('box-shadow', '0 0 0 2px #4e8cff, 0 0 10px rgba(0,0,0,0.2)');
+            tooltip.text('Stop following');
+            btn.attr('data-id', btn.attr('data-id').replace('_FALSE', '_TRUE')); // Update data-id
+        } else {
+            btn.css('box-shadow', 'none');
+            tooltip.text('Click to follow');
+            btn.attr('data-id', btn.attr('data-id').replace('_TRUE', '_FALSE')); // Update data-id
+        }
+    ", btn_id))
+    
+    cat("Button clicked to ", fl_request, " handle", handle, "\n")
+
+    # Print debug info
+    tryCatch({
+      sys <- import("sys")
+      sys$argv <- c('./follow_new_user.py', handle,fl_request)
+      source_python("./follow_new_user.py")
+
+      logs(paste0("followed ", handle, " successful.\n"))
+    }, error = function(e) {
+      logs(paste0("Error during follow_new_user: ", e$message, "\n"))
+      updateTabsetPanel(session, "main_tabs", selected = "Logs")
+      stop("Error during follow_new_user: ", e$message, "\n")
+    })
+  })
+  
+  
+  
   output$fl_table_out <- renderDT({
     df <- follows()
     if (input$follows && is.data.frame(df) && nrow(df) > 0) {
       df[!is.na(df$Display.Name) & df$Display.Name == '', 'Display.Name'] <- '<i>n.a.</i>'
-      df$avatar <- paste0('<img src="', df$avatar, '" style="width: 35px; height: 35px; border-radius: 50%; overflow: hidden; object-fit: cover;">')
+      # browser()
+      # df$avatar <- paste0('<img src="', df$avatar, '" style="width: 35px; height: 35px; border-radius: 50%; overflow: hidden; object-fit: cover;">')
+      # browser()
+      isolate(df$avatar <- mapply(
+        avatar_btn, 
+        img = df$avatar,  
+        id_prefix = "avatar_btn", 
+        handle = df$Handle,
+        SIMPLIFY = TRUE
+      ))
       df$user <- paste0(
         '<table style="width: 100%;">
         <th style="padding:0;">
@@ -688,7 +886,13 @@ shinyServer(function(input, output, session) {
     df <- mutuals()
     if (is.data.frame(df) && nrow(df) > 0) {
       df[!is.na(df$Display.Name) & df$Display.Name == '', 'Display.Name'] <- '<i>n.a.</i>'
-      df$avatar <- paste0('<img src="', df$avatar, '" style="width: 50px; height: 50px; border-radius: 50%; overflow: hidden; object-fit: cover;">')
+      isolate(df$avatar <- mapply(
+        avatar_btn, 
+        img = df$avatar,  
+        id_prefix = "avatar_btn", 
+        handle = df$Handle,
+        SIMPLIFY = TRUE
+      ))
       df$user <- paste0(
         '<table style="width: 100%;">
         <th style="padding:0;">
@@ -781,7 +985,15 @@ shinyServer(function(input, output, session) {
     df <- followers()
     if (input$followers && is.data.frame(df) && nrow(df) > 0) {
       df[!is.na(df$Display.Name) & df$Display.Name == '', 'Display.Name'] <- '<i>n.a.</i>'
-      df$avatar <- paste0('<img src="', df$avatar, '" style="width: 40px; height: 40px; border-radius: 50%; overflow: hidden; object-fit: cover;">')
+      # df$avatar <- paste0('<img src="', df$avatar, '" style="width: 40px; height: 40px; border-radius: 50%; overflow: hidden; object-fit: cover;">')
+      isolate(df$avatar <- mapply(
+        avatar_btn, 
+        img = df$avatar,  
+        id_prefix = "avatar_btn", 
+        handle = df$Handle,
+        SIMPLIFY = TRUE
+      ))
+      
       df$user <- paste0(
         '<table style="width: 100%;">
         <th style="padding:0;">
@@ -824,13 +1036,14 @@ shinyServer(function(input, output, session) {
   })
   
   output$selected_for_anal <- renderUI({
-    if (is.null(input$fler_table_out_rows_selected) && is.null(input$fl_table_out_rows_selected) && is.null(input$sp_table_out_rows_selected)) {
+    if (is.null(input$mut_table_out_rows_selected) && is.null(input$fler_table_out_rows_selected) && is.null(input$fl_table_out_rows_selected) && is.null(input$sp_table_out_rows_selected)) {
       disable('run_users')
       HTML('<i><span style="color: grey; font-size: 13px;">Select users / starter packs for analysis.</span></i>')
     } else {
       enable('run_users')
       request = list(follow = follows()[input$fl_table_out_rows_selected, 'Handle'],
                      follower = followers()[input$fler_table_out_rows_selected, 'Handle'],
+                     mutual = mutuals()[input$mut_table_out_rows_selected, 'Handle'],
                      sp = sp_df()[input$sp_table_out_rows_selected, 'Starter.Pack.Name'])
       req_df <- do.call(rbind, lapply(names(request), function(name) {
         if (length(unlist(request[[name]] > 0))) {
