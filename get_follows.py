@@ -116,8 +116,10 @@ def main():
     get_followers = sys.argv[3]
 
     logging.info(f"User is {user} and get_follows is {get_follows} and get_followers is {get_followers}")
+    print("Begin")
 
     try:
+        print("Checkpoint 0: Start.")
         # get SPs for user themselves
         self_user_obj = client.get_profile(user)
         self_display_name = getattr(self_user_obj, 'display_name', '')
@@ -129,6 +131,8 @@ def main():
         self_associated = getattr(self_user_obj, 'associated', None)
         self_starter_packs = getattr(self_associated, 'starter_packs', None) if self_associated else None  
 
+        print("Checkpoint 1: User profile fetched successfully.")
+
         # Fetch followers and follows
         result = get_all_followers_and_follows(client, user, get_followers, get_follows)
         if result.get("status") == "error":
@@ -137,10 +141,14 @@ def main():
         followers = result["followers"]
         follows = result["follows"]
 
+        print("Checkpoint 2: Followers and follows fetched successfully.")
+
         # Identify mutual connections
         mutuals = {f for f in followers if f in follows}
         unique_followers = followers - mutuals
         unique_follows = follows - mutuals
+
+        print("Checkpoint 3: Mutual connections identified successfully.")
 
         # Save to file
         output_file = f'./flwer_data_{user}.tsv'
@@ -154,6 +162,8 @@ def main():
                 writer.writerow(['Follow', handle, avatar, display_name, description, created, starter_packs or ''])
             for handle, avatar, display_name, description, created, starter_packs in mutuals:
                 writer.writerow(['Mutual', handle, avatar, display_name, description, created, starter_packs or ''])
+        
+        print("Checkpoint 4: Data saved to file successfully.")
 
         logging.info(f"User list saved to {output_file}")
         logging.info(f"Self: {(user, self_display_name, self_starter_packs)}\nFollows: {unique_follows}\nFollowers: {unique_followers}")

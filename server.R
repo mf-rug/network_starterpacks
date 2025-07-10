@@ -15,7 +15,7 @@ reticulate::use_virtualenv('venv_bsky_network', required = TRUE)
 
 
 shinyServer(function(input, output, session) {
-  # shinyjs::runjs("$('#add_prompt').attr('maxlength', 250)")
+  shinyjs::runjs("$('#add_prompt').attr('maxlength', 1250)")
   # Reactive values
   sp_df <- reactiveVal(NULL)
   users_df <- reactiveVal(NULL)
@@ -28,6 +28,7 @@ shinyServer(function(input, output, session) {
   sp_table_all_button <- reactiveVal(NULL)
   req_df <- reactiveVal(NULL)
   username_already_follows <- reactiveVal(NULL)
+  mut_table_all_button <- reactiveVal(NULL)
   
   # Function to load and merge part files
   load_and_merge_parts <- function(user, recover=FALSE) {
@@ -676,10 +677,6 @@ shinyServer(function(input, output, session) {
           '</details>'
         ))
     }
-  })
-  
-  observe({
-    fl_table_out_search <- input$fl_table_out_search
   })
   
   

@@ -24,7 +24,7 @@ def load_client():
 # Initialize client and login
 client = load_client()
 
-user_list_path = sys.argv[1]  # Path to the user list file
+flwer_data_path = sys.argv[1]  # Path to the user list file
 centered_user = sys.argv[2]  # Path to the user list file
 start_line = int(sys.argv[3])  # Starting line of the batch
 end_line = int(sys.argv[4])  # Ending line of the batch
@@ -79,7 +79,7 @@ def fetch_starter_packs(client, actor):
 def main():
     try:
         # Read the input file and extract the relevant range of users
-        with open(user_list_path, 'r', newline='', encoding='utf-8') as file:
+        with open(flwer_data_path, 'r', newline='', encoding='utf-8') as file:
             reader = csv.DictReader(file, delimiter='\t')  # Read as dictionary for column names
             rows = list(reader)  # Convert to list for slicing
 
@@ -96,10 +96,14 @@ def main():
         all_data = []
 
         for user in users_to_process:
+            logging.info(f'user is {user}')
             user_type = user['Type']
             handle = user['Handle']
-            display_name = user['Display Name']
-
+            try:
+                display_name = user['Display.Name']
+            except:
+                display_name = 'n.a.'
+                
             logging.info(f"Processing user {handle} ({user_type})")
 
             # Fetch starter packs for the user
@@ -147,3 +151,5 @@ def main():
         return {"status": "error", "message": f"Error in main(): {str(e)}"}
 
 
+# if __name__ == '__main__':
+    # main()
