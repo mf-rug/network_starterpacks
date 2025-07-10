@@ -11,7 +11,7 @@ logging.basicConfig(
     level=logging.INFO,            # Log level
     format='%(asctime)s - %(levelname)s - %(message)s'
 )
-logging.info(f"Running now get_follows.py.")
+logging.info(f"Running now get_follows.py!")
 
 def load_client():
     client = Client()
@@ -105,12 +105,10 @@ def get_all_followers_and_follows(client, user,get_flers, get_fls, aslist=False)
         logging.error(f"Error fetching followers/follows: {str(e)}")
         return {"status": "error", "message": f"Error fetching followers/follows: {str(e)}"}
 
+logging.info(f"loading client")
+client = load_client()
 
 def main():
-
-    logging.info(f"loading client")
-    client = load_client()
-
     # Initialize client and login
     logging.info(f"User check")
     user = sys.argv[1]

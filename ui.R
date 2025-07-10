@@ -21,8 +21,8 @@ shinyUI(page_navbar(
         rel = "stylesheet"
       )
     ),
-    includeCSS("www/theme.css"),
-    includeScript("www/custom.js")
+    # includeCSS("www/theme.css"),
+    # includeScript("www/custom.js")
   ),
   nav_spacer(), # push nav items to the right
   nav_item(HTML('<span style="white-space: nowrap; font-size: 11px;">made by <a href ="https://bsky.app/profile/maxfus.bsky.social" target="_blank">Max Fürst</a></span>'), ),
@@ -77,8 +77,9 @@ shinyUI(page_navbar(
                                     ),
                                   height = '100px'          
                                   ),
-                                HTML('<p style="margin:5px 0 10px;"><strong>Filter for SP users: </strong></p>'),
+                                HTML('<p style="margin:5px 0 10px;"><strong>Filter users: </strong></p>'),
                                 prettySwitch('already_fl', 'Exclude accounts user already follows', TRUE, 'info'),
+                                prettySwitch('filter_only_sp', 'Apply filters only to SP users', TRUE, 'info'),
                                 sliderInput('post_cutoff', HTML('&nbspExclude if post count under'), 1, 200, 20),
                                 sliderInput('sp_cutoff', HTML('&nbspExclude if SP appearances under'), 1, 50, 1),
                                 sliderInput('fllwer_cutoff', HTML('&nbspExclude if followers under'), 1, 250, 10),

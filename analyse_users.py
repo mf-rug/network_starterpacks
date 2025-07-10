@@ -49,6 +49,7 @@ def load_client():
 def generate_prompt(app_user, app_user_description, add_prompt, profile, posts, org_posts_n, posts_text):
     if app_user == 'None':
         requestor_text = '''Rate how interesting this user is to follow on a scale of 1-10. Favor users with more total and engaging posts and disfavor users that mostly repost intead of original posts.'''
+        requestor_text = ''
     else:
         requestor_text = f'''Rate how interesting this user is to follow on a scale of 1-10, based on these criteria:
                                 - Does the user have many and engaging posts?

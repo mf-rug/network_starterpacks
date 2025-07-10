@@ -15,7 +15,7 @@ reticulate::use_virtualenv('venv_bsky_network', required = TRUE)
 
 
 shinyServer(function(input, output, session) {
-  shinyjs::runjs("$('#add_prompt').attr('maxlength', 250)")
+  # shinyjs::runjs("$('#add_prompt').attr('maxlength', 250)")
   # Reactive values
   sp_df <- reactiveVal(NULL)
   users_df <- reactiveVal(NULL)
@@ -144,6 +144,7 @@ shinyServer(function(input, output, session) {
         sys$argv <- c('./get_follows.py', input$user, input$follows, input$followers)
         cat('Running this command:\n', paste('python3 get_follows.py',  input$user, input$follows, input$followers), '\n')
         source_python("./get_follows.py")
+        # browser()
         already_fls <- get_all_followers_and_follows(client, input$username, 'FALSE', 'TRUE', aslist = TRUE)
         already_fls <- py_to_r(already_fls$follows) %>% sapply(., function(x) x[[1]])
         username_already_follows(already_fls)
@@ -336,11 +337,11 @@ shinyServer(function(input, output, session) {
           TRUE, #input$aisum,
           ifelse(input$api_key == '' || is.null(input$api_key), 'None', input$api_key),
           ifelse(input$add_prompt == '' || is.null(input$add_prompt), 'None', input$add_prompt),
-          0, #, input$post_cutoff,
-          NA, #, input$sp_cutoff,
-          0, #, input$fllwer_cutoff,
-          0, #, input$days_cutoff,
-          FALSE, #, input$already_fl
+          ifelse(input$filter_only_sp, 0, input$post_cutoff),
+          ifelse(input$filter_only_sp, NA, input$sp_cutoff),
+          ifelse(input$filter_only_sp, 0, input$fllwer_cutoff),
+          ifelse(input$filter_only_sp, 0, input$days_cutoff),
+          ifelse(input$filter_only_sp, FALSE, input$already_fl),
           paste0(job_id, '_sps')
         )
         sys$argv <- sys_args
@@ -634,7 +635,7 @@ shinyServer(function(input, output, session) {
     if (is.data.frame(df) && nrow(df) > 0) {
       if (is.null(sp_table_all_button()) || sp_table_all_button() == '<i>select all</i>') {
         updateActionButton(session = getDefaultReactiveDomain(), 'all_sps', label = '<i>unselect all</i>')
-        selectRows(sp_table_out_proxy, selected = 1:nrow(df))
+        selectRows(sp_table_out_proxy, selected = input$sp_table_out_rows_all)
         sp_table_all_button('<i>unselect all</i>')
       } else {
         sp_table_all_button('<i>select all</i>')
@@ -677,13 +678,17 @@ shinyServer(function(input, output, session) {
     }
   })
   
+  observe({
+    fl_table_out_search <- input$fl_table_out_search
+  })
+  
   
   observeEvent(input$all_fls, {
     df <- follows()
     if (is.data.frame(df) && nrow(df) > 0) {
       if (is.null(fl_table_all_button()) || fl_table_all_button() == '<i>select all</i>') {
         updateActionButton(session = getDefaultReactiveDomain(), 'all_fls', label = '<i>unselect all</i>')
-        selectRows(fl_table_out_proxy, selected = 1:nrow(df))
+        selectRows(fl_table_out_proxy, selected = input$fl_table_out_rows_all)
         fl_table_all_button('<i>unselect all</i>')
       } else {
         fl_table_all_button('<i>select all</i>')
@@ -870,7 +875,7 @@ shinyServer(function(input, output, session) {
     if (is.data.frame(df) && nrow(df) > 0) {
       if (is.null(mut_table_all_button()) || mut_table_all_button() == '<i>select all</i>') {
         updateActionButton(session = getDefaultReactiveDomain(), 'all_muts', label = '<i>unselect all</i>')
-        selectRows(mut_table_out_proxy, selected = 1:nrow(df))
+        selectRows(mut_table_out_proxy, selected = input$mut_table_out_rows_all)
         mut_table_all_button('<i>unselect all</i>')
       } else {
         mut_table_all_button('<i>select all</i>')
@@ -971,7 +976,7 @@ shinyServer(function(input, output, session) {
     if (is.data.frame(df) && nrow(df) > 0) {
       if (is.null(fler_table_all_button()) || fler_table_all_button() == '<i>select all</i>') {
         updateActionButton(session = getDefaultReactiveDomain(), 'all_flers', label = '<i>unselect all</i>')
-        selectRows(fler_table_out_proxy, selected = 1:nrow(df))
+        selectRows(fler_table_out_proxy, selected = input$fler_table_out_rows_all)
         fler_table_all_button('<i>unselect all</i>')
       } else {
         fler_table_all_button('<i>select all</i>')
