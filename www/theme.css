@@ -1,0 +1,181 @@
+/* Table cell styles for various tables */
+#fler_table_out table > thead > tr > th,
+#fler_table_out table > tbody > tr > th,
+#fler_table_out table > tfoot > tr > th,
+#fler_table_out table > thead > tr > td,
+#fler_table_out table > tbody > tr > td,
+#fler_table_out table > tfoot > tr > td,
+#fl_table_out table > thead > tr > th,
+#fl_table_out table > tbody > tr > th,
+#fl_table_out table > tfoot > tr > th,
+#fl_table_out table > thead > tr > td,
+#fl_table_out table > tbody > tr > td,
+#fl_table_out table > tfoot > tr > td,
+#sp_table_out table > thead > tr > th,
+#sp_table_out table > tbody > tr > th,
+#sp_table_out table > tfoot > tr > th,
+#sp_table_out table > thead > tr > td,
+#sp_table_out table > tbody > tr > td,
+#sp_table_out table > tfoot > tr > td,
+#user_table_out table > thead > tr > th,
+#user_table_out table > tbody > tr > th,
+#user_table_out table > tfoot > tr > th,
+#user_table_out table > thead > tr > td,
+#user_table_out table > tbody > tr > td,
+#user_table_out table > tfoot > tr > td {
+    padding: 0.2rem; 
+    margin: 0; 
+    vertical-align: middle; 
+}
+
+/* Scrollable table styles */
+.scrollablex {
+    max-width: 25vw;
+    margin: 0;
+    padding: 0;
+    white-space: nowrap; /* Prevent text from wrapping */
+    overflow-x: scroll;
+    overflow-y: hidden; /* Disable vertical scrolling */
+    table-layout: fixed;
+}
+.scrollable {
+    width: 100%;
+    max-height: 175px;
+    margin: 0;
+    padding: 0;
+    overflow: scroll;
+    table-layout: fixed;
+}
+
+/* User table styles */
+.user {
+    padding: -3px, -3, -3px;
+    overflow-x: scroll;
+    table-layout: fixed;
+}
+
+/* Details and summary styles */
+details > summary {
+    list-style-type: none;
+}
+details[open] > summary {
+    list-style-type: none;
+}
+details {
+    border: 1px solid transparent;
+    box-shadow: 2px 2px 8px rgba(50, 180, 200, 0.3);
+    border-image: repeating-linear-gradient(to right,
+        #c4e17f 7%, #c4e17f 14%,
+        #c9ff56 21%, #f2fa71 27%,
+        #fad071 33%, #fad071 40%,
+        #f0766b 47%, #f0766b 54%,
+        #db9dbe 60%, #db9dbe 66%,
+        #c49cdf 71%, #c49cdf 78%,
+        #6599e2 84%, #6599e2 90%,
+        #61c2e4 95%, #61c2e4 100%
+    );
+    border-image-slice: 1;
+    background: linear-gradient(to right, rgba(0, 100, 50, 0.01), rgba(0, 200, 150, 0.05)); 
+    border-radius: 0.5rem;
+    padding: 0.5rem;
+}
+details[open] > summary {
+    margin-bottom: 0.5rem;
+}
+
+/* User details styles */
+.user_details > summary {
+    list-style-type: none;
+}
+.user_details[open] > summary {
+    list-style-type: none;
+}
+.user_details {
+    border: 1.5px solid transparent;
+    box-shadow: 2px 2px 8px rgba(50, 180, 200, 0.3);
+    border-image: repeating-linear-gradient(to left,
+        #c4e17f 7%, #c4e17f 14%,
+        #c9ff56 21%, #f2fa71 27%,
+        #fad071 33%, #fad071 40%,
+        #f0766b 47%, #f0766b 54%,
+        #db9dbe 60%, #db9dbe 66%,
+        #c49cdf 71%, #c49cdf 78%,
+        #6599e2 84%, #6599e2 90%,
+        #61c2e4 95%, #61c2e4 100%
+    );
+    border-image-slice: 1;
+    background: linear-gradient(to right, rgba(50, 0, 80, 0.01), rgba(100, 0, 150, 0.05)); 
+    border-radius: 0.5rem;
+    padding: 0.5rem;
+}
+.user_details[open] > summary {
+    margin-bottom: 0.5rem;
+}
+
+/* Avatar button styles */
+.avatar-btn {
+    cursor: pointer;
+    transition: all 0.2s ease;
+    position: relative;
+}
+.avatar-btn:hover {
+    transform: scale(1.05);
+    box-shadow: 0 0 0 2px #4e8cff, 0 0 10px rgba(0,0,0,0.2);
+}
+.avatar-tooltip {
+    position: absolute;
+    background-color: rgba(0, 0, 0, 0.3);
+    color: #fff;
+    text-align: center;
+    padding: 5px;
+    border-radius: 50%;
+    width: 100%;
+    height: 100%;
+    top: 0;
+    left: 0;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s;
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    text-shadow: 0px 0px 2px black;
+    pointer-events: none;
+}
+.avatar-tooltip.visible {
+    visibility: visible;
+    opacity: 0.8;
+}
+
+/* Slider container styles */
+.slider-container {
+    display: flex;
+    align-items: center;
+    width: 100%;
+}
+.slider-label {
+    width: 100px; /* Set a fixed width for all labels */
+    font-size: 11pt;
+    text-align: right; /* Align text to the right */
+    margin-right: 10px;
+    white-space: nowrap; /* Prevents label from breaking into two lines */
+}
+.slider-wrapper {
+    flex-grow: 1; /* Allows the slider to expand */
+}
+.custom-switch .shiny-input-container {
+  margin: 0 !important;
+}
+.custom-switch .pretty.p-default.p-switch {
+  margin-right: 0 !important;
+}
+.custom-switch .pretty.p-switch {
+    transform: scale(0.82); /* Makes the switch smaller */
+    transform-origin: right center; /* Ensures alignment */
+    margin-right: -10px; /* Adjusts spacing after scaling */
+  }
+.small-textarea textarea {
+  font-size: 9pt !important;
+}

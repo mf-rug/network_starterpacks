@@ -21,8 +21,8 @@ shinyUI(page_navbar(
         rel = "stylesheet"
       )
     ),
-    # includeCSS("www/theme.css"),
-    # includeScript("www/custom.js")
+    includeCSS("www/theme.css"),
+    includeScript("www/custom.js")
   ),
   nav_spacer(), # push nav items to the right
   nav_item(HTML('<span style="white-space: nowrap; font-size: 11px;">made by <a href ="https://bsky.app/profile/maxfus.bsky.social" target="_blank">Max Fürst</a></span>'), ),
@@ -70,14 +70,16 @@ shinyUI(page_navbar(
                                 ),
                             div(id='ai_hidden',
                                 passwordInput("api_key", HTML("Provide an OpenAI <a href='https://platform.openai.com/api-keys'>API key</a>")),
-                                textAreaInput(
-                                  "add_prompt",
-                                  HTML(
-                                    '<p style="line-height:0.94;margin:0px 0 -1px;">Additional intructions to AI prompt<br><span style="color:grey; font-size:13px;">(e.g.: <i>"focus ranking on similar scientific interests"</i>) </span></p>'
-                                    ),
-                                  value = 'Rate how interesting this user is to follow on a scale of 1-10. Favor users with more total and engaging posts and disfavor users that mostly repost intead of original posts.'
-                                  height = '100px'          
-                                  ),
+                                tags$div(class = 'small-textarea',
+                                         textAreaInput(
+                                    "add_prompt",
+                                    HTML(
+                                      '<p style="line-height:0.94;margin:0px 0 -1px;">Additional intructions to AI prompt<br><span style="color:grey; font-size:13px;">(e.g.: <i>"focus ranking on similar scientific interests"</i>) </span></p>'
+                                      ),
+                                    value = 'Rate how interesting this user is to follow on a scale of 1-10. Favor users with more total and engaging posts and disfavor users that mostly repost instead of original posts.\n',
+                                    height = '100px'          
+                                         )
+                                ),
                                 HTML('<p style="margin:5px 0 10px;"><strong>Filter users: </strong></p>'),
                                 prettySwitch('already_fl', 'Exclude accounts user already follows', TRUE, 'info'),
                                 prettySwitch('filter_only_sp', 'Apply filters only to SP users', TRUE, 'info'),
