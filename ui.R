@@ -30,7 +30,7 @@ shinyUI(page_navbar(
   nav_item(
     input_dark_mode(id = "dark_mode")
   ),
-  nav_panel('Main',
+  nav_panel('Main', 
     sidebarLayout(
       sidebarPanel(
         HTML('<strong>Login</strong>'),

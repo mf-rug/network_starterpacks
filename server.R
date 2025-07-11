@@ -29,6 +29,7 @@ shinyServer(function(input, output, session) {
   req_df <- reactiveVal(NULL)
   username_already_follows <- reactiveVal(NULL)
   mut_table_all_button <- reactiveVal(NULL)
+  restore_mode <- reactiveVal(FALSE)
   
   # Function to load and merge part files
   load_and_merge_parts <- function(user, recover=FALSE) {
@@ -372,12 +373,12 @@ shinyServer(function(input, output, session) {
   observeEvent(input$restore_users, {
     # browser()
     flwer_data <- read.delim(
-      'maxfus.bsky.social_user_data_detailed_160kmeBZdGx9VuNvqlLYQgKEs2ych4Sp5OijAnJTX3RUbMCrI8zPFoDf7WHawt_sps.tsv',
+      'jeremymberg.bsky.social_user_data_detailed_8GtYo1u5zJ2gjwWvp0MD9dSOrNCTHBkaXEefm7I34hliPRZcxFqAQL6VbnUKys_sps.tsv',
       header = TRUE,
       sep = "\t",
       stringsAsFactors = FALSE
     )
-    # browser()
+    restore_mode(TRUE)
     users_df(flwer_data)
   })
   
@@ -399,6 +400,8 @@ shinyServer(function(input, output, session) {
              '<span><i class="fa fa-chevron-down"></i></span>',
             '</span></summary>',
             DT::dataTableOutput('user_table_out'),
+            '<i>click on profile icon to follow user, or</i>', 
+            actionBttn('follow_all', HTML('<i>follow all users on current page</i>'), style = 'minimal', color = 'primary', size = 's'),
             '</details>'
           ))
       } else {
@@ -407,6 +410,29 @@ shinyServer(function(input, output, session) {
     } else {
       DT::dataTableOutput('user_table_out')
     }
+  })
+  
+  observeEvent(input$follow_all, {
+    # browser()
+    df <- user_table_aft_filter()
+    handles <- df[input$user_table_out_rows_current, 'user']
+    handles <- str_extract(handles, '(?<="_blank\">).*(?=</a><br><span style)')
+  
+    sapply(handles, function(handle) { 
+      sys <- import("sys")
+      sys$argv <- c('./follow_new_user.py', handle, 'follow')
+      source_python("./follow_new_user.py")
+      logs(paste0("followed ", handle, " successful.\n"))
+      btn_id <- paste0('avatar_btn_', handle)
+      username_already_follows(c(username_already_follows(), handle))
+      runjs(sprintf("
+        var btn = $('[id=\"%s\"]');
+        btn.css('box-shadow', '0 0 0 2px #4e8cff, 0 0 10px rgba(0,0,0,0.2)');
+        tooltip.text('Stop following');
+        btn.attr('data-id', btn.attr('data-id').replace('_FALSE', '_TRUE')); // Update data-id
+
+    ", btn_id))
+    })
   })
   
   user_table_bef_filter <- reactive({
@@ -483,7 +509,8 @@ shinyServer(function(input, output, session) {
               '</table>',
             '</div>'
           )
-       }
+      }
+
       df <- rbind(df1,df2)
       colnames(df) <- c('user', 'name', 'avatar', 'SPs', 'posts', 'reposts', 'fllwrs', 'fllws', 'Description', 'lastPosts', 'AIcateg', 'AIsig', 'AIsummary')
       df$lastPosts <- str_replace_all(df$lastPosts, '\\|\\|\\-\\-\\|\\|', '<br><br>• ') %>% 
@@ -504,7 +531,8 @@ shinyServer(function(input, output, session) {
       # browser()
       df$reposts <- sapply(df$reposts, function(x) if (!is.na(x) && !str_detect(x, "NA")) { paste0(x, '%') } else {x})
       df$reposts <- paste0('<p style="text-align:right;margin:0;padding:0;">', df$reposts, '</p>')
-      if (isolate(input$aisum)) {
+
+      if (isolate(input$aisum) || restore_mode()) {
         df <- df[order(df$SPs, decreasing = TRUE), c('user', 'posts', 'reposts', 'fllwrs', 'fllws', 'lastPosts', 'AIcateg', 'AIsig', 'AIsummary')]
       } else {
         if (isolate(input$get_posts)) {
@@ -552,6 +580,7 @@ shinyServer(function(input, output, session) {
         rownames = FALSE,
         escape = FALSE,
         options = list(pageLength = 20,
+                       lengthMenu = c(10, 20, 50, 100, 500),
                        scrollX = '400px'
         ))
     }
@@ -1025,7 +1054,8 @@ shinyServer(function(input, output, session) {
         str_replace('$', '</p></div>')
       datatable(df,
                 escape = FALSE,
-                rownames = FALSE) %>% 
+                rownames = FALSE,
+                options = list(search = list(regex = TRUE))) %>% 
         formatStyle(0, target = 'row', lineHeight='75%')
     }
   })
